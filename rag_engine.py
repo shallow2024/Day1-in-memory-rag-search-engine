@@ -17,6 +17,8 @@ from groq import Groq
 MODEL_NAME = "llama-3.3-70b-versatile"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "technical_docs"
+DEFAULT_MAX_DISTANCE = 0.75
+INSUFFICIENT_CONTEXT_MESSAGE = "The retrieved context does not contain enough information."
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,15 @@ def retrieve(collection: Collection, query: str, top_k: int = 3) -> list[dict[st
     ]
 
 
+def has_relevant_context(
+    context: Sequence[dict[str, str]], max_distance: float = DEFAULT_MAX_DISTANCE
+) -> bool:
+    """Return whether the closest chunk is relevant enough to use."""
+    if max_distance <= 0:
+        raise ValueError("max_distance must be greater than 0.")
+    return bool(context) and float(context[0]["distance"]) <= max_distance
+
+
 def build_prompt(query: str, context: Sequence[dict[str, str]]) -> str:
     """Build a strict prompt that keeps the generation grounded."""
     context_text = "\n\n".join(
@@ -153,6 +164,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("query", nargs="?", help="Question to ask the technical docs")
     parser.add_argument("--top-k", type=int, default=3, help="Number of chunks to retrieve")
     parser.add_argument(
+        "--max-distance",
+        type=float,
+        default=DEFAULT_MAX_DISTANCE,
+        help=f"Reject weak matches above this Chroma distance (default: {DEFAULT_MAX_DISTANCE})",
+    )
+    parser.add_argument(
         "--retrieve-only",
         action="store_true",
         help="Print retrieved chunks without calling Groq",
@@ -170,6 +187,9 @@ def main() -> int:
     try:
         collection = build_collection()
         context = retrieve(collection, query, top_k=args.top_k)
+        if not has_relevant_context(context, max_distance=args.max_distance):
+            print(f"\n{INSUFFICIENT_CONTEXT_MESSAGE}")
+            return 0
         print_retrieval(context)
         if args.retrieve_only:
             return 0

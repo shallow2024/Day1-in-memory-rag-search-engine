@@ -22,6 +22,7 @@ flowchart LR
 - Semantic retrieval rather than exact keyword matching.
 - In-memory ChromaDB for a zero-database-file prototype.
 - Prompt grounding: the generator is instructed to use only retrieved context.
+- A Chroma distance cutoff that rejects weak matches with `The retrieved context does not contain enough information.`
 - Safe failure when `GROQ_API_KEY` is missing.
 - A `--retrieve-only` mode that works without a Groq key.
 
@@ -96,7 +97,16 @@ Examples:
 ```powershell
 python rag_engine.py "What are sentence embeddings?" --top-k 2 --retrieve-only
 python rag_engine.py "How should a FastAPI AI service handle errors?"
+python rag_engine.py "What is the capital of France?" --retrieve-only
 ```
+
+For an unrelated question, the default relevance cutoff prevents weakly related chunks from being displayed or sent to Groq:
+
+```text
+The retrieved context does not contain enough information.
+```
+
+The cutoff uses Chroma's distance value, where lower is more similar. You can tune it for a different document collection with `--max-distance 0.75`.
 
 ## Data lifecycle
 
